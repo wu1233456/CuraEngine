@@ -1,4 +1,4 @@
-//Copyright (c) 2021 Ultimaker B.V.
+//Copyright (c) 2018 Ultimaker B.V.
 //CuraEngine is released under the terms of the AGPLv3 or higher.
 
 #ifndef WIREFRAME2GCODE_H
@@ -7,7 +7,7 @@
 #include <functional> // passing function pointer or lambda as argument to a function
 
 #include "RetractionConfig.h"
-#include "settings/types/Angle.h" //For the nozzle expansion angle setting.
+#include "settings/types/AngleRadians.h" //For the nozzle expansion angle setting.
 #include "utils/NoCopy.h"
 
 namespace cura
@@ -34,6 +34,7 @@ private:
     double extrusion_mm3_per_mm_flat;
     bool update_extrusion_offset;
     coord_t nozzle_outer_diameter;
+    coord_t nozzle_head_distance;
     AngleRadians nozzle_expansion_angle;
     coord_t nozzle_clearance;
     coord_t nozzle_top_diameter;

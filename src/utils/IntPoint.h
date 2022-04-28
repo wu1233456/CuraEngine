@@ -1,4 +1,4 @@
-//Copyright (c) 2020 Ultimaker B.V.
+//Copyright (c) 2018 Ultimaker B.V.
 //CuraEngine is released under the terms of the AGPLv3 or higher.
 
 #ifndef UTILS_INT_POINT_H
@@ -11,7 +11,7 @@ Integer points are used to avoid floating point rounding errors, and because Cli
 #define INLINE static inline
 
 //Include Clipper to get the ClipperLib::IntPoint definition, which we reuse as Point definition.
-#include <polyclipping/clipper.hpp>
+#include <clipper.hpp>
 #include <cmath>
 #include <functional> // for hash function object
 #include <iostream> // auto-serialization / auto-toString()
@@ -39,6 +39,11 @@ namespace cura
 /* 64bit Points are used mostly throughout the code, these are the 2D points from ClipperLib */
 typedef ClipperLib::IntPoint Point;
 
+class IntPoint {
+public:
+    int X, Y;
+    Point p() { return Point(X, Y); }
+};
 #define POINT_MIN std::numeric_limits<ClipperLib::cInt>::min()
 #define POINT_MAX std::numeric_limits<ClipperLib::cInt>::max()
 
@@ -59,8 +64,6 @@ INLINE Point operator/(const Point& p0, const Point& p1) { return Point(p0.X/p1.
 INLINE Point& operator += (Point& p0, const Point& p1) { p0.X += p1.X; p0.Y += p1.Y; return p0; }
 INLINE Point& operator -= (Point& p0, const Point& p1) { p0.X -= p1.X; p0.Y -= p1.Y; return p0; }
 
-INLINE bool operator < (const Point& p0, const Point& p1) { return p0.X < p1.X || (p0.X == p1.X && p0.Y < p1.Y); }
-
 /* ***** NOTE *****
    TL;DR: DO NOT implement operators *= and /= because of the default values in ClipperLib::IntPoint's constructor.
 
@@ -79,25 +82,16 @@ INLINE coord_t vSize2(const Point& p0)
 }
 INLINE float vSize2f(const Point& p0)
 {
-    return static_cast<float>(p0.X)*static_cast<float>(p0.X)+static_cast<float>(p0.Y)*static_cast<float>(p0.Y);
+    return float(p0.X)*float(p0.X)+float(p0.Y)*float(p0.Y);
 }
 
-INLINE bool shorterThen(const Point& p0, const coord_t len)
+INLINE bool shorterThen(const Point& p0, int32_t len)
 {
     if (p0.X > len || p0.X < -len)
-    {
         return false;
-    }
     if (p0.Y > len || p0.Y < -len)
-    {
         return false;
-    }
-    return vSize2(p0) <= len * len;
-}
-
-INLINE bool shorterThan(const Point& p0, const coord_t len)
-{
-    return shorterThen(p0, len);
+    return vSize2(p0) <= len*len;
 }
 
 INLINE coord_t vSize(const Point& p0)
@@ -137,11 +131,6 @@ INLINE coord_t dot(const Point& p0, const Point& p1)
     return p0.X * p1.X + p0.Y * p1.Y;
 }
 
-INLINE coord_t cross(const Point& p0, const Point& p1)
-{
-    return p0.X * p1.Y - p0.Y * p1.X;
-}
-
 INLINE int angle(const Point& p)
 {
     double angle = std::atan2(p.X, p.Y) / M_PI * 180.0;
@@ -149,14 +138,8 @@ INLINE int angle(const Point& p)
     return angle;
 }
 
-// Identity function, used to be able to make templated algorithms where the input is sometimes points, sometimes things that contain or can be converted to points.
-INLINE const Point& make_point(const Point& p)
-{
-    return p;
-}
-
 }//namespace cura
-
+    
 namespace std {
 template <>
 struct hash<cura::Point> {
@@ -166,7 +149,7 @@ struct hash<cura::Point> {
         int result = 89;
         result = result * prime + pp.X;
         result = result * prime + pp.Y;
-        return result;
+        return result; 
     }
 };
 }
@@ -205,14 +188,6 @@ public:
         matrix[1] /= f;
         matrix[2] = -matrix[1];
         matrix[3] = matrix[0];
-    }
-
-    static PointMatrix scale(double s)
-    {
-        PointMatrix ret;
-        ret.matrix[0] = s;
-        ret.matrix[3] = s;
-        return ret;
     }
 
     Point apply(const Point p) const

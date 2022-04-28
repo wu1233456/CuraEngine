@@ -1,11 +1,10 @@
-//Copyright (c) 2020 Ultimaker B.V.
-//CuraEngine is released under the terms of the AGPLv3 or higher.
-
+/** Copyright (C) 2016 Ultimaker - Released under terms of the AGPLv3 License */
 #ifndef UTILS_LAZY_INITIALIZATION_H
 #define UTILS_LAZY_INITIALIZATION_H
 
 #include <functional> // bind, function
-#include <optional>
+
+#include "optional.h"
 
 namespace cura
 {
@@ -34,7 +33,25 @@ public:
     , constructor(
             [args...]()
             {
-                return T(args...);
+                return new T(args...);
+            }
+        )
+    { }
+
+    /*!
+     * Delayed function call for creating a T object
+     * 
+     * Performs a copy from the return value of the function on the stack to the heap.
+     * 
+     * \warning passing references or pointers as parameters means these objects will be given to the function object at evaluation time.
+     * Make sure these references/pointers are not invalidated between construction of the lazy object and the evaluation.
+     */
+    LazyInitialization(const std::function<T (Args...)>& f, Args... args)
+    : std::optional<T>()
+    , constructor(
+            [f, args...]()
+            {
+                return new T(f(args...));
             }
         )
     { }
@@ -45,7 +62,7 @@ public:
      * \warning passing references or pointers as parameters means these objects will be given to the function object at evaluation time.
      * Make sure these references/pointers are not invalidated between construction of the lazy object and the evaluation.
      */
-    LazyInitialization(const std::function<T (Args...)>& f, Args... args)
+    LazyInitialization(const std::function<T* (Args...)>& f, Args... args)
     : std::optional<T>()
     , constructor(
             [f, args...]()
@@ -75,18 +92,18 @@ public:
      */
     T& operator*()
     {
-        if (!std::optional<T>::has_value())
+        if (!std::optional<T>::instance)
         {
-            std::optional<T>::operator=(std::move(constructor()));
+            std::optional<T>::instance = constructor();
         }
         return std::optional<T>::operator*();
     }
 
     T* operator->() const
     {
-        if (!std::optional<T>::has_value())
+        if (!std::optional<T>::instance)
         {
-            std::optional<T>::operator=(std::move(constructor()));
+            std::optional<T>::instance = constructor();
         }
         return std::optional<T>::operator->();
     }
@@ -105,7 +122,7 @@ public:
     }
 
 private:
-    std::function<T()> constructor;
+    std::function<T* ()> constructor;
 };
 
 }//namespace cura

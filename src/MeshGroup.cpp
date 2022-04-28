@@ -1,4 +1,4 @@
-//Copyright (C) 2020 Ultimaker B.V.
+//Copyright (C) 2018 Ultimaker B.V.
 //CuraEngine is released under the terms of the AGPLv3 or higher.
 
 #include <string.h>
@@ -6,9 +6,7 @@
 #include <limits>
 
 #include "MeshGroup.h"
-#include "settings/types/Ratio.h" //For the shrinkage percentage and scale factor.
-#include "utils/floatpoint.h" //To accept incoming meshes with floating point vertices.
-#include "utils/FMatrix4x3.h" //To transform the input meshes for shrinkage compensation and to align in command line mode.
+#include "utils/floatpoint.h"
 #include "utils/gettime.h"
 #include "utils/logoutput.h"
 #include "utils/string.h"
@@ -107,22 +105,9 @@ void MeshGroup::finalize()
         }
         mesh.offset(mesh_offset + meshgroup_offset);
     }
-    scaleFromBottom(settings.get<Ratio>("material_shrinkage_percentage_xy"), settings.get<Ratio>("material_shrinkage_percentage_z")); //Compensate for the shrinkage of the material.
 }
 
-void MeshGroup::scaleFromBottom(const Ratio factor_xy, const Ratio factor_z)
-{
-    const Point3 center = (max() + min()) / 2;
-    const Point3 origin(center.x, center.y, 0);
-
-    const FMatrix4x3 transformation = FMatrix4x3::scale(factor_xy, factor_xy, factor_z, origin);
-    for(Mesh& mesh : meshes)
-    {
-        mesh.transform(transformation);
-    }
-}
-
-bool loadMeshSTL_ascii(Mesh* mesh, const char* filename, const FMatrix4x3& matrix)
+bool loadMeshSTL_ascii(Mesh* mesh, const char* filename, const FMatrix3x3& matrix)
 {
     FILE* f = fopen(filename, "rt");
     char buffer[1024];
@@ -155,7 +140,7 @@ bool loadMeshSTL_ascii(Mesh* mesh, const char* filename, const FMatrix4x3& matri
     return true;
 }
 
-bool loadMeshSTL_binary(Mesh* mesh, const char* filename, const FMatrix4x3& matrix)
+bool loadMeshSTL_binary(Mesh* mesh, const char* filename, const FMatrix3x3& matrix)
 {
     FILE* f = fopen(filename, "rb");
 
@@ -208,9 +193,9 @@ bool loadMeshSTL_binary(Mesh* mesh, const char* filename, const FMatrix4x3& matr
     return true;
 }
 
-bool loadMeshSTL(Mesh* mesh, const char* filename, const FMatrix4x3& matrix)
+bool loadMeshSTL(Mesh* mesh, const char* filename, const FMatrix3x3& matrix)
 {
-    FILE* f = fopen(filename, "rb");
+    FILE* f = fopen(filename, "r");
     if (f == nullptr)
     {
         return false;
@@ -265,7 +250,7 @@ bool loadMeshSTL(Mesh* mesh, const char* filename, const FMatrix4x3& matrix)
     return loadMeshSTL_binary(mesh, filename, matrix);
 }
 
-bool loadMeshIntoMeshGroup(MeshGroup* meshgroup, const char* filename, const FMatrix4x3& transformation, Settings& object_parent_settings)
+bool loadMeshIntoMeshGroup(MeshGroup* meshgroup, const char* filename, const FMatrix3x3& transformation, Settings& object_parent_settings)
 {
     TimeKeeper load_timer;
 
@@ -280,7 +265,6 @@ bool loadMeshIntoMeshGroup(MeshGroup* meshgroup, const char* filename, const FMa
             return true;
         }
     }
-    logWarning("Unable to recognize the extension of the file. Currently only .stl and .STL are supported.");
     return false;
 }
 

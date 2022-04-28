@@ -1,6 +1,4 @@
-//Copyright (c) 2020 Ultimaker B.V.
-//CuraEngine is released under the terms of the AGPLv3 or higher.
-
+/** Copyright (C) 2017 Ultimaker - Released under terms of the AGPLv3 License */
 #ifndef GCODE_LAYER_THREADER_H
 #define GCODE_LAYER_THREADER_H
 
@@ -8,9 +6,9 @@
 #include <functional> // function
 #include <thread> // sleep
 #include <chrono> // milliseconds
-#include <optional>
 
 #include "utils/logoutput.h"
+#include "utils/optional.h"
 #include "utils/Lock.h"
 
 namespace cura
@@ -29,6 +27,19 @@ namespace cura
  * 
  * \warning This class is only adequate when the expected production time of an item is more than (n_threads - 1) times as much as the expected consumption time of an item
  */
+/*
+* 生产商和消费者在以下情况下的构造：
+*-生产可以并行进行
+*-消耗必须是有序的，而不是多线程的
+* 
+*层索引被传递给项目生产者，以产生不同的项目。
+* 
+*每个线程都进行生产和消耗，如果有的线程可用，则优先考虑消耗。
+* 
+*如果只有一个线程，则每次生成一个项目时都会消耗。
+* 
+*警告只有当项目的预期生产时间超过项目预期消耗时间的（n_-1）倍时，此类才足够
+*/
 template <typename T>
 class GcodeLayerThreader
 {
@@ -187,7 +198,7 @@ void GcodeLayerThreader<T>::act()
             if (to_be_consumed_item_idx && consume_lock.test_lock())
             {
                 item_idx = *to_be_consumed_item_idx;
-                to_be_consumed_item_idx = std::nullopt;
+                to_be_consumed_item_idx = nullptr;
             }
         }
         if (item_idx >= 0)

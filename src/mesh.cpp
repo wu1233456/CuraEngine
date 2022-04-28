@@ -93,22 +93,7 @@ void Mesh::expandXY(int64_t offset)
     }
 }
 
-void Mesh::transform(const FMatrix4x3& transformation)
-{
-    for(MeshVertex& v : vertices)
-    {
-        v.p = transformation.apply(v.p);
-    }
-    aabb.min = transformation.apply(aabb.min);
-    aabb.max = transformation.apply(aabb.max);
-}
 
-
-bool Mesh::isPrinted() const
-{
-    return !settings.get<bool>("infill_mesh") && !settings.get<bool>("cutting_mesh") && !settings.get<bool>("anti_overhang_mesh");
-}
-    
 int Mesh::findIndexOfVertex(const Point3& v)
 {
     uint32_t hash = pointHash(v);

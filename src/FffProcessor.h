@@ -1,4 +1,4 @@
-//Copyright (c) 2021 Ultimaker B.V.
+//Copyright (c) 2018 Ultimaker B.V.
 //CuraEngine is released under the terms of the AGPLv3 or higher.
 
 #ifndef FFF_PROCESSOR_H
@@ -9,6 +9,7 @@
 #include "utils/gettime.h"
 #include "utils/NoCopy.h"
 
+#define SHOW_ALL_SETTINGS true
 
 namespace cura {
 
@@ -26,11 +27,12 @@ public:
      * Get the instance
      * \return The instance
      */
-    static FffProcessor* getInstance()
+    static FffProcessor* getInstance() 
     {
-        return &instance;
+        return &instance; 
     }
 
+public:
     /*!
      * The gcode writer, which generates paths in layer plans in a buffer, which converts these paths into gcode commands.
      */
@@ -53,7 +55,10 @@ public:
      * 
      * \param filename The filename of the file to which to write the gcode.
      */
-    bool setTargetFile(const char* filename);
+    bool setTargetFile(const char* filename)
+    {
+        return gcode_writer.setTargetFile(filename);
+    }
 
     /*!
      * Set the target to write gcode to: an output stream.
@@ -62,7 +67,10 @@ public:
      * 
      * \param stream The stream to write gcode to.
      */
-    void setTargetStream(std::ostream* stream);
+    void setTargetStream(std::ostream* stream)
+    {
+        return gcode_writer.setTargetStream(stream);
+    }
 
     /*!
      * Get the total extruded volume for a specific extruder in mm^3
@@ -72,19 +80,28 @@ public:
      * \param extruder_nr The extruder number for which to get the total netto extruded volume
      * \return total filament printed in mm^3
      */
-    double getTotalFilamentUsed(int extruder_nr);
+    double getTotalFilamentUsed(int extruder_nr)
+    {
+        return gcode_writer.getTotalFilamentUsed(extruder_nr);
+    }
 
     /*!
      * Get the total estimated print time in seconds for each feature
      * 
      * \return total print time in seconds for each feature
      */
-    std::vector<Duration> getTotalPrintTimePerFeature();
+    std::vector<Duration> getTotalPrintTimePerFeature()
+    {
+        return gcode_writer.getTotalPrintTimePerFeature();
+    }
 
     /*!
      * Add the end gcode and set all temperatures to zero.
      */
-    void finalize();
+    void finalize()
+    {
+        gcode_writer.finalize();
+    }
 };
 
 }//namespace cura

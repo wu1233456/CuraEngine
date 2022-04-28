@@ -152,11 +152,12 @@ protected:
     void reset();
 
     /*!
-     * Add a line to the result while reverse-applying the rotation matrix.
+     * Add a line to the result but not applying the rotation matrix.
      * 
-     * \param polyline The polyline to add
+     * \param from The one end of the line segment
+     * \param to The other end of the line segment
      */
-    void addPolyline(PolygonRef polyline);
+    void addLine(Point from, Point to);
 
     /*!
      * Checks whether the current connector should be added or not.
@@ -225,13 +226,9 @@ inline void ZigzagConnectorProcessor::reset()
     current_connector.clear();
 }
 
-inline void ZigzagConnectorProcessor::addPolyline(PolygonRef polyline)
+inline void ZigzagConnectorProcessor::addLine(Point from, Point to)
 {
-    result.emplace_back(polyline);
-    for (Point& p : result.back())
-    {
-        p = rotation_matrix.unapply(p);
-    }
+    result.addLine(rotation_matrix.unapply(from), rotation_matrix.unapply(to));
 }
 
 

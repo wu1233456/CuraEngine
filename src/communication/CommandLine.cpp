@@ -1,4 +1,4 @@
-//Copyright (c) 2020 Ultimaker B.V.
+//Copyright (c) 2018 Ultimaker B.V.
 //CuraEngine is released under the terms of the AGPLv3 or higher.
 
 #include <cstring> //For strtok and strcopy.
@@ -19,7 +19,7 @@
 #include "../FffProcessor.h" //To start a slice and get time estimates.
 #include "../Slice.h"
 #include "../utils/getpath.h"
-#include "../utils/FMatrix4x3.h" //For the mesh_rotation_matrix setting.
+#include "../utils/floatpoint.h"
 #include "../utils/logoutput.h"
 
 namespace cura
@@ -104,7 +104,7 @@ void CommandLine::sliceNext()
 
     slice.scene.extruders.reserve(arguments.size() >> 1); //Allocate enough memory to prevent moves.
     slice.scene.extruders.emplace_back(0, &slice.scene.settings); //Always have one extruder.
-    ExtruderTrain* last_extruder = &slice.scene.extruders[0];
+    ExtruderTrain& last_extruder = slice.scene.extruders[0];
 
     for (size_t argument_index = 2; argument_index < arguments.size(); argument_index++)
     {
@@ -161,7 +161,7 @@ void CommandLine::sliceNext()
                         enableProgressLogging();
                         break;
                     }
-                    case 'j':
+                    case 'j'://json file location
                     {
                         argument_index++;
                         if (argument_index >= arguments.size())
@@ -179,20 +179,16 @@ void CommandLine::sliceNext()
                         //If this was the global stack, create extruders for the machine_extruder_count setting.
                         if (last_settings == &slice.scene.settings)
                         {
-                            const size_t extruder_count = slice.scene.settings.get<size_t>("machine_extruder_count");
+                           
+                            const size_t extruder_count = slice.scene.settings.get<size_t>("machine_extruder_count");//得到机器喷头个数
                             while (slice.scene.extruders.size() < extruder_count)
                             {
                                 slice.scene.extruders.emplace_back(slice.scene.extruders.size(), &slice.scene.settings);
                             }
                         }
-                        //If this was an extruder stack, make sure that the extruder_nr setting is correct.
-                        if (last_settings == &last_extruder->settings)
-                        {
-                            last_extruder->settings.add("extruder_nr", std::to_string(last_extruder->extruder_nr));
-                        }
                         break;
                     }
-                    case 'e':
+                    case 'e': //extruder
                     {
                         size_t extruder_nr = stoul(argument.substr(2));
                         while (slice.scene.extruders.size() <= extruder_nr) //Make sure we have enough extruders up to the extruder_nr that the user wanted.
@@ -200,11 +196,9 @@ void CommandLine::sliceNext()
                             slice.scene.extruders.emplace_back(extruder_nr, &slice.scene.settings);
                         }
                         last_settings = &slice.scene.extruders[extruder_nr].settings;
-                        last_settings->add("extruder_nr", argument.substr(2));
-                        last_extruder = &slice.scene.extruders[extruder_nr];
                         break;
                     }
-                    case 'l':
+                    case 'l':  //location of stl file
                     {
                         argument_index++;
                         if (argument_index >= arguments.size())
@@ -214,9 +208,9 @@ void CommandLine::sliceNext()
                         }
                         argument = arguments[argument_index];
 
-                        const FMatrix4x3 transformation = last_settings->get<FMatrix4x3>("mesh_rotation_matrix"); //The transformation applied to the model when loaded.
+                        const FMatrix3x3 transformation = last_settings->get<FMatrix3x3>("mesh_rotation_matrix"); //The transformation applied to the model when loaded.
 
-                        if (!loadMeshIntoMeshGroup(&slice.scene.mesh_groups[mesh_group_index], argument.c_str(), transformation, last_extruder->settings))
+                        if (!loadMeshIntoMeshGroup(&slice.scene.mesh_groups[mesh_group_index], argument.c_str(), transformation, last_extruder.settings))
                         {
                             logError("Failed to load model: %s. (error number %d)\n", argument.c_str(), errno);
                             exit(1);
@@ -227,7 +221,7 @@ void CommandLine::sliceNext()
                         }
                         break;
                     }
-                    case 'o':
+                    case 'o': //output of gcode
                     {
                         argument_index++;
                         if (argument_index >= arguments.size())
@@ -300,7 +294,7 @@ void CommandLine::sliceNext()
         log("Loaded from disk in %5.3fs\n", FffProcessor::getInstance()->time_keeper.restart());
 
         //Start slicing.
-        slice.compute();
+        slice.compute();//切片启动
 #ifndef DEBUG
     }
     catch(...)
@@ -338,6 +332,8 @@ int CommandLine::loadJSON(const std::string& json_filename, Settings& settings)
     }
 
     std::unordered_set<std::string> search_directories = defaultSearchDirectories(); //For finding the inheriting JSON files.
+    //for (std::string s : search_directories) { std::cout<<"****"<<std::endl; }
+    //std::cout <<search_directories.size()<< "****" << std::endl;
     std::string directory = getPathName(json_filename);
     search_directories.emplace(directory);
 
@@ -356,7 +352,7 @@ std::unordered_set<std::string> CommandLine::defaultSearchDirectories()
 #else
         char delims[] = ";"; //Semicolon for Windows.
 #endif
-        char paths[128 * 1024]; //Maximum length of environment variable.
+        char paths[32 * 1024]; //Maximum length of environment variable.
         strcpy(paths, search_path_env); //Necessary because strtok actually modifies the original string, and we don't want to modify the environment variable itself.
         char* path = strtok(paths, delims);
         while (path != nullptr)
@@ -396,9 +392,12 @@ int CommandLine::loadJSON(const rapidjson::Document& document, const std::unorde
         if (metadata.HasMember("machine_extruder_trains") && metadata["machine_extruder_trains"].IsObject())
         {
             const rapidjson::Value& extruder_trains = metadata["machine_extruder_trains"];
+            
             for (rapidjson::Value::ConstMemberIterator extruder_train = extruder_trains.MemberBegin(); extruder_train != extruder_trains.MemberEnd(); extruder_train++)
             {
+               
                 const int extruder_nr = atoi(extruder_train->name.GetString());
+                std::cout<<extruder_nr<<"****"<<std::endl;
                 if (extruder_nr < 0)
                 {
                     continue;
@@ -414,11 +413,13 @@ int CommandLine::loadJSON(const rapidjson::Document& document, const std::unorde
                 }
                 const std::string extruder_definition_id(extruder_id.GetString());
                 const std::string extruder_file = findDefinitionFile(extruder_definition_id, search_directories);
+               
                 loadJSON(extruder_file, scene.extruders[extruder_nr].settings);
             }
         }
     }
-
+    
+    
     if (document.HasMember("settings") && document["settings"].IsObject())
     {
         loadJSONSettings(document["settings"], settings);
@@ -437,6 +438,9 @@ void CommandLine::loadJSONSettings(const rapidjson::Value& element, Settings& se
         const std::string name = setting->name.GetString();
 
         const rapidjson::Value& setting_object = setting->value;
+        /*if (name == "wall_line_count_0") {
+            std::cout <<  "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;
+        }*/
         if (!setting_object.IsObject())
         {
             logError("JSON setting %s is not an object!\n", name.c_str());
@@ -447,6 +451,7 @@ void CommandLine::loadJSONSettings(const rapidjson::Value& element, Settings& se
         {
             loadJSONSettings(setting_object["children"], settings);
         }
+        
         else //Only process leaf settings. We don't process categories or settings that have sub-settings.
         {
             if (!setting_object.HasMember("default_value"))

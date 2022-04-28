@@ -1,4 +1,4 @@
-//Copyright (c) 2021 Ultimaker B.V.
+//Copyright (c) 2018 Ultimaker B.V.
 //CuraEngine is released under the terms of the AGPLv3 or higher.
 
 #include "Application.h" //To flush g-code through the communication channel.
@@ -7,6 +7,7 @@
 #include "gcodeExport.h"
 #include "LayerPlan.h"
 #include "LayerPlanBuffer.h"
+#include "MergeInfillLines.h"
 #include "Slice.h"
 #include "communication/Communication.h" //To flush g-code through the communication channel.
 #include "utils/logoutput.h"
@@ -42,14 +43,17 @@ LayerPlan* LayerPlanBuffer::processBuffer()
     processFanSpeedLayerTime();
     if (buffer.size() >= 2)
     {
+        
         addConnectingTravelMove(*--(--buffer.end()), *--buffer.end());
     }
     if (buffer.size() > 0)
     {
+        
         insertTempCommands(); // insert preheat commands of the just completed layer plan (not the newly emplaced one)
     }
     if (buffer.size() > buffer_size)
     {
+        
         LayerPlan* ret = buffer.front();
         Application::getInstance().communication->flushGCode();
         buffer.pop_front();
@@ -86,6 +90,8 @@ void LayerPlanBuffer::addConnectingTravelMove(LayerPlan* prev_layer, const Layer
 
     Point first_location_new_layer = new_layer_destination_state->first;
 
+    assert(newest_layer->extruder_plans.front().extruder_nr == prev_layer->extruder_plans.back().extruder_nr);
+    assert(newest_layer->extruder_plans.front().paths.size() > 0);
     assert(newest_layer->extruder_plans.front().paths[0].points.size() == 1);
     assert(newest_layer->extruder_plans.front().paths[0].points[0] == first_location_new_layer);
 
@@ -96,16 +102,9 @@ void LayerPlanBuffer::addConnectingTravelMove(LayerPlan* prev_layer, const Layer
         const Settings& extruder_settings = Application::getInstance().current_slice->scene.extruders[prev_layer->extruder_plans.back().extruder_nr].settings;
         prev_layer->setIsInside(new_layer_destination_state->second);
         const bool force_retract = extruder_settings.get<bool>("retract_at_layer_change") ||
-          (mesh_group_settings.get<bool>("travel_retract_before_outer_wall") && (mesh_group_settings.get<InsetDirection>("inset_direction") == InsetDirection::OUTSIDE_IN || mesh_group_settings.get<size_t>("wall_line_count") == 1)); //Moving towards an outer wall.
+          (mesh_group_settings.get<bool>("travel_retract_before_outer_wall") && (mesh_group_settings.get<bool>("outer_inset_first") || mesh_group_settings.get<size_t>("wall_line_count") == 1)); //Moving towards an outer wall.
         prev_layer->final_travel_z = newest_layer->z;
-        GCodePath &path = prev_layer->addTravel(first_location_new_layer, force_retract);
-        if (force_retract && !path.retract)
-        {
-            // addTravel() won't use retraction if the travel distance is less than retraction minimum travel setting
-            // so to avoid blobs when moving to the new layer height, which can occur if the z-axis speed is very slow,
-            // we force the path to use retraction
-            path.retract = true;
-        }
+        prev_layer->addTravel(first_location_new_layer, force_retract);
     }
 }
 
@@ -290,12 +289,7 @@ void LayerPlanBuffer::insertTempCommands(std::vector<ExtruderPlan*>& extruder_pl
         insertPreheatCommand_singleExtrusion(*prev_extruder_plan, extruder, extruder_plan.required_start_temperature);
         prev_extruder_plan->extrusion_temperature_command = --prev_extruder_plan->inserts.end();
     }
-    else if (Application::getInstance().current_slice->scene.extruders[extruder].settings.get<bool>("machine_extruders_share_heater"))
-    {
-        // extruders share a heater so command the previous extruder to change to the temperature required for this extruder
-        insertPreheatCommand_singleExtrusion(*prev_extruder_plan, prev_extruder, extruder_plan.required_start_temperature);
-    }
-    else
+    else 
     {
         insertPreheatCommand_multiExtrusion(extruder_plans, extruder_plan_idx);
         insertFinalPrintTempCommand(extruder_plans, extruder_plan_idx - 1);
@@ -510,7 +504,6 @@ void LayerPlanBuffer::insertTempCommands()
         const Temperature print_temp = preheat_config.getTemp(extruder, avg_flow, extruder_plan.is_initial_layer);
         const Temperature initial_print_temp = extruder_settings.get<Temperature>("material_initial_print_temperature");
         if (initial_print_temp == 0.0 // user doesn't want to use initial print temp feature
-            || extruder_settings.get<bool>("machine_extruders_share_heater") // ignore initial print temps when extruders share a heater
             || !extruder_used_in_meshgroup[extruder] // prime blob uses print temp rather than initial print temp
             || (overall_extruder_plan_idx > 0 && extruder_plans[overall_extruder_plan_idx - 1]->extruder_nr == extruder  // prev plan has same extruder ..
                 && extruder_plans[overall_extruder_plan_idx - 1]->estimates.getTotalUnretractedTime() > 0.0) // and prev extruder plan already heated to printing temperature

@@ -32,7 +32,7 @@ public:
      * Precompute the octree of subdivided cubes
      * \param mesh contains infill layer data and settings
      */
-    static void precomputeOctree(SliceMeshStorage& mesh, const Point& infill_origin);
+    static void precomputeOctree(SliceMeshStorage& mesh);
 
     /*!
      * Generates the lines of subdivision of the specific cube at the specific layer. It recursively calls itself, so it ends up drawing all the subdivision lines of sub-cubes too.
@@ -47,7 +47,7 @@ private:
      * \param result (output) The resulting lines
      * \param directional_line_groups Array of 3 times a polylines. Used to keep track of line segments that are all pointing the same direction for line segment combining
      */
-    void generateSubdivisionLines(const coord_t z, Polygons (&directional_line_groups)[3]);
+    void generateSubdivisionLines(const coord_t z, Polygons& result, Polygons (&directional_line_groups)[3]);
 
     struct CubeProperties
     {

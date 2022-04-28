@@ -1,4 +1,4 @@
-//Copyright (c) 2021 Ultimaker B.V.
+//Copyright (c) 2018 Ultimaker B.V.
 //CuraEngine is released under the terms of the AGPLv3 or higher.
 
 #include "SubDivCube.h"
@@ -6,7 +6,7 @@
 #include <functional>
 
 #include "../sliceDataStorage.h"
-#include "../settings/types/Angle.h" //For the infill angle.
+#include "../settings/types/AngleRadians.h" //For the infill angle.
 #include "../utils/math.h"
 #include "../utils/polygonUtils.h"
 
@@ -34,13 +34,10 @@ SubDivCube::~SubDivCube()
     }
 }
 
-void SubDivCube::precomputeOctree(SliceMeshStorage& mesh, const Point& infill_origin)
+void SubDivCube::precomputeOctree(SliceMeshStorage& mesh)
 {
     radius_addition = mesh.settings.get<coord_t>("sub_div_rad_add");
-
-    // if infill_angles is not empty use the first value, otherwise use 0
-    const std::vector<AngleDegrees> infill_angles = mesh.settings.get<std::vector<AngleDegrees>>("infill_angles");
-    const AngleDegrees infill_angle = (!infill_angles.empty()) ? infill_angles[0] : AngleDegrees(0);
+    AngleRadians infill_angle = 45;
 
     const coord_t furthest_dist_from_origin = std::sqrt(square(mesh.settings.get<coord_t>("machine_height")) + square(mesh.settings.get<coord_t>("machine_depth") / 2) + square(mesh.settings.get<coord_t>("machine_width") / 2));
     const coord_t max_side_length = furthest_dist_from_origin * 2;
@@ -61,7 +58,7 @@ void SubDivCube::precomputeOctree(SliceMeshStorage& mesh, const Point& infill_or
             curr_recursion_depth++;
         }
     }
-    Point3 center(infill_origin.X, infill_origin.Y, 0);
+    Point3 center(0, 0, 0);
 
     Point3Matrix tilt; // rotation matrix to get from axis aligned cubes to cubes standing on their tip
     // The Z axis is transformed to go in positive Y direction
@@ -95,7 +92,7 @@ void SubDivCube::generateSubdivisionLines(const coord_t z, Polygons& result)
     }
     Polygons directional_line_groups[3];
 
-    generateSubdivisionLines(z, directional_line_groups);
+    generateSubdivisionLines(z, result, directional_line_groups);
 
     for (int dir_idx = 0; dir_idx < 3; dir_idx++)
     {
@@ -107,7 +104,7 @@ void SubDivCube::generateSubdivisionLines(const coord_t z, Polygons& result)
     }
 }
 
-void SubDivCube::generateSubdivisionLines(const coord_t z, Polygons (&directional_line_groups)[3])
+void SubDivCube::generateSubdivisionLines(const coord_t z, Polygons& result, Polygons (&directional_line_groups)[3])
 {
     CubeProperties cube_properties = cube_properties_per_recursion_step[depth];
 
@@ -144,7 +141,7 @@ void SubDivCube::generateSubdivisionLines(const coord_t z, Polygons (&directiona
     {
         if (children[idx] != nullptr)
         {
-            children[idx]->generateSubdivisionLines(z, directional_line_groups);
+            children[idx]->generateSubdivisionLines(z, result, directional_line_groups);
         }
     }
 }
@@ -233,12 +230,7 @@ coord_t SubDivCube::distanceFromPointToMesh(SliceMeshStorage& mesh, const LayerI
         return 2;
         *distance2 = 0;
     }
-    Polygons collide;
-    for (const SliceLayerPart& part : mesh.layers[layer_nr].parts)
-    {
-        collide.add(part.infill_area);
-    }
-
+    Polygons& collide = mesh.layers[layer_nr].getInnermostWalls(2, mesh);
     Point centerpoint = location;
     bool inside = collide.inside(centerpoint);
     ClosestPolygonPoint border_point = PolygonUtils::moveInside2(collide, centerpoint);

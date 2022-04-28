@@ -1,4 +1,4 @@
-//Copyright (c) 2022 Ultimaker B.V.
+//Copyright (c) 2018 Ultimaker B.V.
 //CuraEngine is released under the terms of the AGPLv3 or higher.
 
 #include <cmath> // sqrt
@@ -6,7 +6,7 @@
 
 #include "Application.h" //To get the communication channel.
 #include "ExtruderTrain.h"
-#include "PathOrderOptimizer.h" //For skirt/brim.
+#include "pathOrderOptimizer.h" //For skirt/brim.
 #include "PrintFeature.h"
 #include "Slice.h"
 #include "weaveDataStorage.h"
@@ -24,7 +24,7 @@ namespace cura
 void Wireframe2gcode::writeGCode()
 {
     Settings& scene_settings = Application::getInstance().current_slice->scene.settings;
-    const size_t start_extruder_nr = scene_settings.get<ExtruderTrain&>("skirt_brim_extruder_nr").extruder_nr; // TODO: figure out how Wireframe works with dual extrusion
+    const size_t start_extruder_nr = scene_settings.get<ExtruderTrain&>("adhesion_extruder_nr").extruder_nr; // TODO: figure out how Wireframe works with dual extrusion
     gcode.preSetup(start_extruder_nr);
     gcode.setInitialAndBuildVolumeTemps(start_extruder_nr);
 
@@ -111,7 +111,7 @@ void Wireframe2gcode::writeGCode()
             {
                 if (vSize2(gcode.getPositionXY() - part.connection.from) > connectionHeight)
                 {
-                    Point3 point_same_height(part.connection.from.x, part.connection.from.y, layer.z1 + MM2INT(0.1));
+                    Point3 point_same_height(part.connection.from.x, part.connection.from.y, layer.z1+100);
                     writeMoveWithRetract(point_same_height);
                 }
                 writeMoveWithRetract(part.connection.from);
@@ -248,7 +248,7 @@ void Wireframe2gcode::strategy_retract(WeaveConnectionPart& part, unsigned int s
     Settings& scene_settings = Application::getInstance().current_slice->scene.settings;
     RetractionConfig retraction_config;
     // TODO: get these from the settings!
-    retraction_config.distance = MM2INT(0.5); //INT2MM(getSettingInt("retraction_amount"))
+    retraction_config.distance = 500; //INT2MM(getSettingInt("retraction_amount"))
     retraction_config.prime_volume = 0;//INT2MM(getSettingInt("retractionPrime
     retraction_config.speed = 20; // 40;
     retraction_config.primeSpeed = 15; // 30;
@@ -258,7 +258,7 @@ void Wireframe2gcode::strategy_retract(WeaveConnectionPart& part, unsigned int s
     retraction_config.retraction_min_travel_distance = scene_settings.get<coord_t>("retraction_min_travel");
 
     double top_retract_pause = 2.0;
-    const coord_t retract_hop_dist = MM2INT(1);
+    int retract_hop_dist = 1000;
     bool after_retract_hop = false;
     //bool go_horizontal_first = true;
     bool lower_retract_start = true;
@@ -515,7 +515,7 @@ Wireframe2gcode::Wireframe2gcode(Weaver& weaver, GCodeExport& gcode)
     update_extrusion_offset = false;
 
     nozzle_outer_diameter = scene_settings.get<coord_t>("machine_nozzle_tip_outer_diameter");    // ___       ___   .
-                                                                                                 //    \     /      .
+    nozzle_head_distance = scene_settings.get<coord_t>("machine_nozzle_head_distance");          //    |     |      .
     nozzle_expansion_angle = scene_settings.get<AngleRadians>("machine_nozzle_expansion_angle"); //     \_U_/       .
     nozzle_clearance = scene_settings.get<coord_t>("wireframe_nozzle_clearance");    // at least line width
     nozzle_top_diameter = tan(nozzle_expansion_angle) * connectionHeight + nozzle_outer_diameter + nozzle_clearance;
@@ -538,11 +538,11 @@ Wireframe2gcode::Wireframe2gcode(Weaver& weaver, GCodeExport& gcode)
     drag_along = scene_settings.get<coord_t>("wireframe_drag_along");
     
     strategy = STRATEGY_COMPENSATE;
-    if (scene_settings.get<std::string>("wireframe_strategy") == "compensate")
+    if (scene_settings.get<std::string>("wireframe_strategy") == "Compensate")
         strategy = STRATEGY_COMPENSATE;
-    if (scene_settings.get<std::string>("wireframe_strategy") == "knot")
+    if (scene_settings.get<std::string>("wireframe_strategy") == "Knot")
         strategy = STRATEGY_KNOT;
-    if (scene_settings.get<std::string>("wireframe_strategy") == "retract")
+    if (scene_settings.get<std::string>("wireframe_strategy") == "Retract")
         strategy = STRATEGY_RETRACT;
     
     go_back_to_last_top = false;
@@ -567,7 +567,7 @@ void Wireframe2gcode::processStartingCode()
 {
     const Settings& scene_settings = Application::getInstance().current_slice->scene.settings;
     const size_t extruder_count = Application::getInstance().current_slice->scene.extruders.size();
-    size_t start_extruder_nr = scene_settings.get<ExtruderTrain&>("skirt_brim_extruder_nr").extruder_nr;
+    size_t start_extruder_nr = scene_settings.get<ExtruderTrain&>("adhesion_extruder_nr").extruder_nr;
 
     if (Application::getInstance().communication->isSequential())
     {
@@ -636,22 +636,21 @@ void Wireframe2gcode::processSkirt()
     {
         return;
     }
-    Polygons skirt = wireFrame.bottom_outline.offset(MM2INT(100 + 5), ClipperLib::jtRound).offset(MM2INT(-100), ClipperLib::jtRound);
-    PathOrderOptimizer<PolygonPointer> order(Point(INT32_MIN, INT32_MIN));
-    for(PolygonRef skirt_path : skirt)
-    {
-        order.addPolygon(skirt_path);
-    }
+    Polygons skirt = wireFrame.bottom_outline.offset(100000+5000).offset(-100000);
+    PathOrderOptimizer order(Point(INT32_MIN, INT32_MIN));
+    order.addPolygons(skirt);
     order.optimize();
 
     const Settings& scene_settings = Application::getInstance().current_slice->scene.settings;
-    for(const PathOrderPath<PolygonPointer>& path : order.paths)
+    for (size_t poly_order_idx = 0; poly_order_idx < skirt.size(); poly_order_idx++)
     {
-        gcode.writeTravel((*path.vertices)[path.start_vertex], scene_settings.get<Velocity>("speed_travel"));
-        for(size_t vertex_index = 0; vertex_index < path.vertices->size(); ++vertex_index)
+        const size_t poly_idx = order.polyOrder[poly_order_idx];
+        PolygonRef poly = skirt[poly_idx];
+        gcode.writeTravel(poly[order.polyStart[poly_idx]], scene_settings.get<Velocity>("speed_travel"));
+        for (unsigned int point_idx = 0; point_idx < poly.size(); point_idx++)
         {
-            Point vertex = (*path.vertices)[(vertex_index + path.start_vertex + 1) % path.vertices->size()];
-            gcode.writeExtrusion(vertex, scene_settings.get<Velocity>("skirt_brim_speed"), scene_settings.get<double>("skirt_brim_line_width") * scene_settings.get<Ratio>("initial_layer_line_width_factor") * INT2MM(initial_layer_thickness), PrintFeatureType::SkirtBrim);
+            Point& p = poly[(point_idx + order.polyStart[poly_idx] + 1) % poly.size()];
+            gcode.writeExtrusion(p, scene_settings.get<Velocity>("skirt_brim_speed"), scene_settings.get<double>("skirt_brim_line_width") * scene_settings.get<Ratio>("initial_layer_line_width_factor") * INT2MM(initial_layer_thickness), PrintFeatureType::SkirtBrim);
         }
     }
 }

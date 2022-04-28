@@ -99,7 +99,9 @@ Ratio GCodePathConfig::getFlowRatio() const
 
 double GCodePathConfig::calculateExtrusion() const
 {
+    //std::cout<<"**"<<flow<<std::endl;
     return INT2MM(line_width) * INT2MM(layer_thickness) * double(flow);
+    //return double(flow);
 }
 
 

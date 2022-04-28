@@ -12,7 +12,7 @@ namespace cura
 {
 
 /*
- * Represents a scene that should be sliced.
+ * Represents a scene that should be sliced.//表示应切片的场景。
  */
 class Scene
 {

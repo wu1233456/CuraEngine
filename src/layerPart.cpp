@@ -8,7 +8,6 @@
 #include "settings/Settings.h"
 #include "progress/Progress.h"
 
-#include "utils/PolylineStitcher.h"
 #include "utils/SVG.h" // debug output
 
 /*
@@ -27,11 +26,7 @@ namespace cura {
 
 void createLayerWithParts(const Settings& settings, SliceLayer& storageLayer, SlicerLayer* layer)
 {
-    PolylineStitcher<Polygons, Polygon, Point>::stitch(layer->openPolylines, storageLayer.openPolyLines, layer->polygons, settings.get<coord_t>("wall_line_width_0"));
-    
-    const coord_t maximum_resolution = settings.get<coord_t>("meshfix_maximum_resolution");
-    const coord_t maximum_deviation = settings.get<coord_t>("meshfix_maximum_deviation");
-    storageLayer.openPolyLines.simplifyPolylines(maximum_resolution, maximum_deviation);
+    storageLayer.openPolyLines = layer->openPolylines;
 
     const bool union_all_remove_holes = settings.get<bool>("meshfix_union_all_remove_holes");
     if (union_all_remove_holes)
@@ -45,65 +40,19 @@ void createLayerWithParts(const Settings& settings, SliceLayer& storageLayer, Sl
 
     std::vector<PolygonsPart> result;
     const bool union_layers = settings.get<bool>("meshfix_union_all");
-    const ESurfaceMode surface_only = settings.get<ESurfaceMode>("magic_mesh_surface_mode");
-    if (surface_only == ESurfaceMode::SURFACE && !union_layers)
-    { // Don't do anything with overlapping areas; no union nor xor
-        result.reserve(layer->polygons.size());
-        for (const PolygonRef poly : layer->polygons)
-        {
-            result.emplace_back();
-            result.back().add(poly);
-        }
-    }
-    else
-    {
-        result = layer->polygons.splitIntoParts(union_layers || union_all_remove_holes);
-    }
-    const coord_t hole_offset = settings.get<coord_t>("hole_xy_offset");
-    for(auto & part : result)
+    result = layer->polygons.splitIntoParts(union_layers || union_all_remove_holes);
+    for(unsigned int i=0; i<result.size(); i++)
     {
         storageLayer.parts.emplace_back();
-        if (hole_offset != 0)
-        {
-            // holes are to be expanded or shrunk
-            Polygons outline;
-            Polygons holes;
-            for (const PolygonRef poly : part)
-            {
-                if (poly.orientation())
-                {
-                    outline.add(poly);
-                }
-                else
-                {
-                    holes.add(poly.offset(hole_offset));
-                }
-            }
-            storageLayer.parts.back().outline.add(outline.difference(holes.unionPolygons()));
-        }
-        else
-        {
-            storageLayer.parts.back().outline = part;
-        }
-        storageLayer.parts.back().boundaryBox.calculate(storageLayer.parts.back().outline);
-        if (storageLayer.parts.back().outline.empty())
-        {
-            storageLayer.parts.pop_back();
-        }
+        storageLayer.parts[i].outline = result[i];
+        storageLayer.parts[i].boundaryBox.calculate(storageLayer.parts[i].outline);
     }
 }
 void createLayerParts(SliceMeshStorage& mesh, Slicer* slicer)
 {
     const auto total_layers = slicer->layers.size();
     assert(mesh.layers.size() == total_layers);
-
-    // OpenMP compatibility fix for GCC <= 8 and GCC >= 9
-    // See https://www.gnu.org/software/gcc/gcc-9/porting_to.html, section "OpenMP data sharing"
-#if defined(__GNUC__) && __GNUC__ <= 8 && !defined(__clang__)
-    #pragma omp parallel for default(none) shared(mesh, slicer) schedule(dynamic)
-#else
-    #pragma omp parallel for default(none) shared(mesh, slicer, total_layers) schedule(dynamic)
-#endif // defined(__GNUC__) && __GNUC__ <= 8
+#pragma omp parallel for default(none) shared(mesh, slicer) schedule(dynamic)
     // Use a signed type for the loop counter so MSVC compiles (because it uses OpenMP 2.0, an old version).
     for (int layer_nr = 0; layer_nr < static_cast<int>(total_layers); layer_nr++)
     {

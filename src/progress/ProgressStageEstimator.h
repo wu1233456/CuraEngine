@@ -1,6 +1,4 @@
-//Copyright (c) 2020 Ultimaker B.V.
-//CuraEngine is released under the terms of the AGPLv3 or higher.
-
+/** Copyright (C) 2016 Tim Kuipers - Released under terms of the AGPLv3 License */
 #ifndef PROGRESS_PROGRESS_STAGE_ESTIMATOR_H
 #define PROGRESS_PROGRESS_STAGE_ESTIMATOR_H
 

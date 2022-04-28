@@ -1,4 +1,4 @@
-//Copyright (C) 2021 Ultimaker B.V.
+//Copyright (C) 2019 Ultimaker B.V.
 //CuraEngine is released under the terms of the AGPLv3 or higher.
 
 #include <iterator>
@@ -8,7 +8,7 @@
 
 #include "AdaptiveLayerHeights.h"
 #include "EnumSettings.h"
-#include "types/Angle.h"
+#include "types/AngleRadians.h"
 #include "../Application.h"
 #include "../Slice.h"
 #include "../utils/floatpoint.h"
@@ -19,7 +19,7 @@ namespace cura
 AdaptiveLayer::AdaptiveLayer(const coord_t layer_height) : layer_height(layer_height) { }
 
 AdaptiveLayerHeights::AdaptiveLayerHeights(const coord_t base_layer_height, const coord_t variation,
-                                           const coord_t step_size, const coord_t threshold)
+                                           const coord_t step_size, const double threshold)
     : base_layer_height(base_layer_height)
     , max_variation(variation)
     , step_size(step_size)
@@ -128,7 +128,7 @@ void AdaptiveLayerHeights::calculateLayers()
 
             // find the minimum slope of all the interesting triangles
             double minimum_slope = std::numeric_limits<double>::max();
-            for (const size_t& triangle_index : triangles_of_interest)
+            for (const int& triangle_index : triangles_of_interest)
             {
                 const double slope = face_slopes.at(triangle_index);
                 if (minimum_slope > slope)
@@ -230,8 +230,8 @@ void AdaptiveLayerHeights::calculateMeshTriangleSlopes()
                 z_angle = M_PI;
             }
 
-            face_min_z_values.push_back(MM2INT(min_z));
-            face_max_z_values.push_back(MM2INT(max_z));
+            face_min_z_values.push_back(min_z * 1000);
+            face_max_z_values.push_back(max_z * 1000);
             face_slopes.push_back(z_angle);
         }
     }

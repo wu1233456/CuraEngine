@@ -6,8 +6,6 @@
 
 #include "settings/Settings.h"
 #include "utils/AABB3D.h"
-#include "utils/floatpoint.h"
-#include "utils/FMatrix4x3.h"
 
 namespace cura
 {
@@ -94,18 +92,6 @@ public:
         aabb.offset(offset);
     }
 
-    /*!
-     * Apply an affine transformation to this mesh's 3D data.
-     * \param transformation The transformation to apply.
-     */
-    void transform(const FMatrix4x3& transformation);
-
-    /*!
-     * Gets whether this is a printable mesh (not an infill mesh, slicing mesh,
-     * etc.)
-     * \return True if it's a mesh that gets printed.
-     */
-    bool isPrinted() const;
 private:
     mutable bool has_disconnected_faces; //!< Whether it has been logged that this mesh contains disconnected faces
     mutable bool has_overlapping_faces; //!< Whether it has been logged that this mesh contains overlapping faces

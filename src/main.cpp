@@ -23,8 +23,13 @@ void signal_FPE(int n)
 }//namespace cura
 
 int main(int argc, char **argv)
-{
+{//"-v","-j","C:/Users/Croquis/Desktop/fdmextruder.def.json"***,"-v","-j","C:/Users/Croquis/Desktop/fdmprinter.def.json","-v","-j","C:/Users/Croquis/Desktop/fdmextruder1.def.json","-e1"
+
+    const char* myargv[20] = {"a","slice","-v","-j","C:/Users/Croquis/Desktop/fdmprinter.def(1).json","-v","-j","C:/Users/Croquis/Desktop/fdmextruder.def.json","-e0","-v","-j","C:/Users/Croquis/Desktop/fdmprinter.def.json","-v","-j","C:/Users/Croquis/Desktop/fdmextruder1.def.json","-e1","-o","D:/g_code/40mm.gcode","-l","C:/Users/Croquis/Documents/sw_2018/40mm.STL" };
+    int myargc = 20;
 #if defined(__linux__) || (defined(__APPLE__) && defined(__MACH__))
+
+
     //Lower the process priority on linux and mac. On windows this is done on process creation from the GUI.
     setpriority(PRIO_PROCESS, 0, 10);
 #endif
@@ -35,7 +40,7 @@ int main(int argc, char **argv)
 #endif
     std::cerr << std::boolalpha;
 
-    cura::Application::getInstance().run(argc, argv);
+    cura::Application::getInstance().run(myargc, (char**)myargv);
 
     return 0;
 }

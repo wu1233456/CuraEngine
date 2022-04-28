@@ -68,7 +68,6 @@ void Scene::processMeshGroup(MeshGroup& mesh_group)
     fff_processor->time_keeper.restart();
 
     TimeKeeper time_keeper_total;
-
     bool empty = true;
     for (Mesh& mesh : mesh_group.meshes)
     {
@@ -91,7 +90,6 @@ void Scene::processMeshGroup(MeshGroup& mesh_group)
 
         Weaver weaver;
         weaver.weave(&mesh_group);
-        
         log("Starting Neith Gcode generation...\n");
         Wireframe2gcode gcoder(weaver, fff_processor->gcode_writer.gcode);
         gcoder.writeGCode();

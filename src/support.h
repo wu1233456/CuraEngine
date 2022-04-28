@@ -61,6 +61,16 @@ public:
      */
     static void generateSupportInfillFeatures(SliceDataStorage& storage);
 
+    /*!
+     * Generate the insets of the given support infill outline.
+     *
+     * \param[out] insets The insets result to output.
+     * \param outline The given support infill outline.
+     * \param inset_count The number of perimeters to surround the support infill outline.
+     * \param wall_line_width_x The wall line width in microns on the X axis.
+     */
+    static void generateOutlineInsets(std::vector<Polygons>& insets, Polygons& outline, const unsigned int inset_count, const coord_t wall_line_width_x);
+
 private:
     /*!
      * Splits the global support areas into separete SupportInfillParts.
@@ -70,6 +80,12 @@ private:
      * \param total_layer_count total number of layers
      */
     static void splitGlobalSupportAreasIntoSupportInfillParts(SliceDataStorage& storage, const std::vector<Polygons>& global_support_areas_per_layer, unsigned int total_layer_count);
+
+    /*!
+     * Generate insets and infill areas for all support infill parts.
+     * \param storage data storage containing the input layer outline data and containing the output support storage per layer
+     */
+    static void prepareInsetsAndInfillAreasForForSupportInfillParts(SliceDataStorage& storage);
 
     /*!
      * Generate gradual support on the already generated support areas. This must be called after generateSupportAreas().
@@ -222,7 +238,7 @@ private:
      * \param bottom_stair_step_layer_count The max height (in nr of layers) of the support bottom stairs
      * \param support_bottom_stair_step_width The max width of the support bottom stairs
      */
-    static void moveUpFromModel(const SliceDataStorage& storage, Polygons& stair_removal, Polygons& sloped_areas, Polygons& support_areas, const size_t layer_idx, const size_t bottom_empty_layer_count, const size_t bottom_stair_step_layer_count, const coord_t support_bottom_stair_step_width);
+    static void moveUpFromModel(const SliceDataStorage& storage, Polygons& stair_removal, Polygons& support_areas, const size_t layer_idx, const size_t bottom_empty_layer_count, const size_t bottom_stair_step_layer_count, const coord_t support_bottom_stair_step_width);
 
     /*!
      * Joins the layer part outlines of all meshes and collects the overhang
